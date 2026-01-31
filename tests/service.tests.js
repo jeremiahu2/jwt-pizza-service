@@ -15,3 +15,17 @@ test('GET /pizzas should return a list of pizzas', async () => {
   expect(res.statusCode).toBe(200);
   expect(Array.isArray(res.body)).toBe(true);
 });
+
+test('POST /pizzas should add a pizza when authorized', async () => {
+  const loginRes = await request(app).post('/login');
+  const token = loginRes.body.authorization;
+  const newPizza = { name: 'Pepperoni', size: 'Large' };
+  const res = await request(app)
+    .post('/pizzas')
+    .set('Authorization', `Bearer ${token}`)
+    .send(newPizza);
+  expect(res.statusCode).toBe(200);
+  expect(res.body).toEqual(
+    expect.arrayContaining([expect.objectContaining({ name: 'Pepperoni' })])
+  );
+});
