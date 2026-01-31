@@ -1,3 +1,6 @@
+console.log('NET_ID:', process.env.NET_ID);
+console.log('FACTORY_API_KEY:', process.env.FACTORY_API_KEY);
+
 const request = require('supertest');
 const app = require('../src/service');
 let token;
