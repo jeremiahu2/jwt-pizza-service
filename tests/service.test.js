@@ -1,8 +1,8 @@
 const request = require('supertest');
 const app = require('../src/service');
+let token;
 
 describe('JWT Pizza Service', () => {
-  let token;
   beforeAll(async () => {
     const res = await request(app)
       .post('/api/auth/login')
@@ -16,12 +16,12 @@ describe('JWT Pizza Service', () => {
     token = res.body?.authorization;
   });
 
-  test('POST /auth/login should return JWT token', () => {
+  test('POST /api/auth/login should return JWT token', () => {
     expect(token).toBeDefined();
     expect(typeof token).toBe('string');
   });
 
-  test('GET /franchise/pizzas should return a list of pizzas', async () => {
+  test('GET /api/franchise/pizzas should return a list of pizzas', async () => {
     const res = await request(app)
       .get('/api/franchise/pizzas')
       .set('Authorization', `Bearer ${token}`);
@@ -29,7 +29,7 @@ describe('JWT Pizza Service', () => {
     expect(Array.isArray(res.body)).toBe(true);
   });
 
-  test('POST /franchise/pizzas should add a pizza when authorized', async () => {
+  test('POST /api/franchise/pizzas should add a pizza when authorized', async () => {
     const newPizza = { name: 'Pepperoni', size: 'Large' };
     const res = await request(app)
       .post('/api/franchise/pizzas')
@@ -37,11 +37,13 @@ describe('JWT Pizza Service', () => {
       .send(newPizza);
     expect(res.statusCode).toBe(200);
     expect(res.body).toEqual(
-      expect.arrayContaining([expect.objectContaining({ name: 'Pepperoni' })])
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'Pepperoni' })
+      ])
     );
   });
 
-  test('POST /franchise/pizzas should fail without token', async () => {
+  test('POST /api/franchise/pizzas should fail without token', async () => {
     const newPizza = { name: 'Margherita', size: 'Medium' };
     const res = await request(app)
       .post('/api/franchise/pizzas')
