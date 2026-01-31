@@ -29,3 +29,11 @@ test('POST /pizzas should add a pizza when authorized', async () => {
     expect.arrayContaining([expect.objectContaining({ name: 'Pepperoni' })])
   );
 });
+
+test('POST /pizzas should fail without token', async () => {
+  const newPizza = { name: 'Margherita', size: 'Medium' };
+  const res = await request(app)
+    .post('/pizzas')
+    .send(newPizza);
+  expect(res.statusCode).toBe(401);
+});
