@@ -9,3 +9,9 @@ describe('JWT Pizza Service', () => {
     expect(typeof res.body.authorization).toBe('string');
   });
 });
+
+test('GET /pizzas should return a list of pizzas', async () => {
+  const res = await request(app).get('/pizzas');
+  expect(res.statusCode).toBe(200);
+  expect(Array.isArray(res.body)).toBe(true);
+});
