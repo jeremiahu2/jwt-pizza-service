@@ -6,11 +6,17 @@ describe('JWT Pizza Service', () => {
   beforeAll(async () => {
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ netId: process.env.NET_ID });
-    token = res.body.authorization;
+      .send({
+        netId: process.env.NET_ID,
+        factoryApiKey: process.env.FACTORY_API_KEY
+      });
+
+    console.log('Login response:', res.body);
+
+    token = res.body?.authorization;
   });
 
-  test('POST /auth/login should return JWT token', async () => {
+  test('POST /auth/login should return JWT token', () => {
     expect(token).toBeDefined();
     expect(typeof token).toBe('string');
   });
