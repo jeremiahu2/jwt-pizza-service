@@ -95,4 +95,24 @@ describe('JWT Pizza Service', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.name).toBe('Updated User');
   });
+
+  test('service.calculatePrice works', () => {
+    const price = service.calculatePrice(2, 5);
+    expect(price).toBe(10);
+  });
+
+  test('db.getUserById works', async () => {
+    const user = await db.getUserById(1);
+    expect(user).toHaveProperty('id');
+  });
+
+  test('db.insertOrder works', async () => {
+    const order = await db.insertOrder({ userId: 1, pizzaId: 1, quantity: 1 });
+    expect(order).toHaveProperty('id');
+  });
+
+  test('db.getAllPizzas works', async () => {
+    const pizzas = await db.getAllPizzas();
+    expect(Array.isArray(pizzas)).toBe(true);
+  });
 });
