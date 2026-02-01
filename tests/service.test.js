@@ -73,4 +73,26 @@ describe('JWT Pizza Service', () => {
       .send({ pizzaId: 1, quantity: 1 });
     expect(res.statusCode).toBe(401);
   });
+
+  test('GET /api/user returns user info when authorized', async () => {
+    const res = await request(app)
+      .get('/api/user')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.email).toBe('boateng@byu.edu');
+  });
+
+  test('GET /api/user fails without token', async () => {
+    const res = await request(app).get('/api/user');
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('PATCH /api/user updates user info', async () => {
+    const res = await request(app)
+      .patch('/api/user')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Updated User' });
+    expect(res.statusCode).toBe(200);
+    expect(res.body.name).toBe('Updated User');
+  });
 });
