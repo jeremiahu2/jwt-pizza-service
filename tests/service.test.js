@@ -45,6 +45,7 @@ describe('JWT Pizza Service – Integration Tests', () => {
       });
     expect(res.status).toBe(200);
     expect(res.body.token).toBeDefined();
+    token = res.body.token;
   });
 
   test('Reject logout without authentication', async () => {
@@ -58,6 +59,18 @@ describe('JWT Pizza Service – Integration Tests', () => {
       .set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.message).toBe('logout successful');
+  });
+
+  test('Login again after logout', async () => {
+    const res = await request(app)
+      .put('/api/auth')
+      .send({
+        email: testUser.email,
+        password: testUser.password,
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeDefined();
+    token = res.body.token;
   });
 
   test('Menu is publicly accessible', async () => {
@@ -100,5 +113,40 @@ describe('JWT Pizza Service – Integration Tests', () => {
     expect(res.status).toBe(200);
     expect(res.body.order).toBeDefined();
     expect(res.body.jwt).toBeDefined();
+  });
+
+  test('Authenticated user can fetch their profile', async () => {
+  const res = await request(app)
+    .get('/api/user')
+    .set('Authorization', `Bearer ${token}`);
+  expect(res.status).toBe(200);
+  expect(res.body.user).toBeDefined();
+  expect(res.body.user.email).toBe(user.email);
+});
+
+
+  test('User profile requires authentication', async () => {
+    const res = await request(app).get('/api/user');
+    expect(res.status).toBe(401);
+  });
+
+  test('Authenticated user can view franchises', async () => {
+    const res = await request(app)
+      .get('/api/franchise')
+      .set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.franchises).toBeDefined();
+    expect(Array.isArray(res.body.franchises)).toBe(true);
+  });
+
+  test('Non-admin cannot create a franchise', async () => {
+    const res = await request(app)
+      .post('/api/franchise')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        name: 'Unauthorized Pizza',
+        admins: [user.id],
+      });
+    expect([401, 403]).toContain(res.status);
   });
 });
