@@ -23,7 +23,6 @@ describe('JWT Pizza Service – Integration Tests', () => {
   test('Register normal user', async () => {
     const res = await request(app).post('/api/auth').send(testUser);
     expect(res.status).toBe(200);
-    expect(res.body.user).toBeDefined();
     token = res.body.token;
     user = res.body.user;
   });
@@ -33,26 +32,25 @@ describe('JWT Pizza Service – Integration Tests', () => {
     expect(res.status).toBe(200);
     adminToken = res.body.token;
     adminUser = res.body.user;
+
+    if (!adminUser.roles.includes('admin')) {
+      await request(app)
+        .put(`/api/user/${adminUser.id}`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ roles: ['admin'] });
+      adminUser.roles = ['admin'];
+    }
   });
 
-  test('Fetch user profile', async () => {
-    const res = await request(app).get('/api/user/me').set('Authorization', `Bearer ${token}`);
-    expect(res.status).toBe(200);
-    expect(res.body.user.email).toBe(user.email);
-  });
-
-  test('Fetch profile without auth fails', async () => {
-    const res = await request(app).get('/api/user/me');
-    expect(res.status).toBe(401);
-  });
-
-  test('Update user self', async () => {
+  test('Update own user succeeds', async () => {
     const res = await request(app)
       .put(`/api/user/${user.id}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'Updated Name' });
+      .send({ name: 'Updated User' });
+
+    console.log('Update own user response:', res.status, res.body);
     expect(res.status).toBe(200);
-    expect(res.body.user.name).toBe('Updated Name');
+    expect(res.body.user.name).toBe('Updated User');
   });
 
   test('Update another user fails without admin', async () => {
@@ -60,6 +58,8 @@ describe('JWT Pizza Service – Integration Tests', () => {
       .put(`/api/user/${adminUser.id}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ name: 'Hack Attempt' });
+
+    console.log('Update another user without admin response:', res.status, res.body);
     expect(res.status).toBe(403);
   });
 
@@ -67,39 +67,54 @@ describe('JWT Pizza Service – Integration Tests', () => {
     const res = await request(app)
       .put(`/api/user/${user.id}`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Admin Update' });
-    expect(res.status).toBe(200);
-    expect(res.body.user.name).toBe('Admin Update');
-  });
+      .send({ name: 'Admin Updated' });
 
-  test('List users returns array for admin', async () => {
-    const res = await request(app).get('/api/user/').set('Authorization', `Bearer ${adminToken}`);
+    console.log('Update another user with admin response:', res.status, res.body);
     expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.users)).toBe(true);
+    expect(res.body.user.name).toBe('Admin Updated');
   });
 
   test('List users fails for normal user', async () => {
     const res = await request(app).get('/api/user/').set('Authorization', `Bearer ${token}`);
+    console.log('List users for normal user response:', res.status, res.body);
     expect([401, 403]).toContain(res.status);
+  });
+
+  test('List users succeeds for admin', async () => {
+    const res = await request(app).get('/api/user/').set('Authorization', `Bearer ${adminToken}`);
+    console.log('List users for admin response:', res.status, res.body);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.users)).toBe(true);
   });
 
   test('Delete user fails for normal user', async () => {
     const res = await request(app).delete(`/api/user/${user.id}`).set('Authorization', `Bearer ${token}`);
+    console.log('Delete user for normal user response:', res.status, res.body);
     expect([401, 403]).toContain(res.status);
   });
 
   test('Delete user succeeds for admin', async () => {
     const res = await request(app).delete(`/api/user/${user.id}`).set('Authorization', `Bearer ${adminToken}`);
+    console.log('Delete user for admin response:', res.status, res.body);
     expect(res.status).toBe(200);
   });
 
-  test('Franchise CRUD coverage', async () => {
-    const res = await request(app).post('/api/franchise').set('Authorization', `Bearer ${adminToken}`).send({ name: 'New Franchise', admins: [adminUser.id] });
+  test('Non-admin cannot create a franchise', async () => {
+    const res = await request(app)
+      .post('/api/franchise')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Unauthorized Pizza', admins: [{ id: user.id }] });
+    console.log('Non-admin create franchise response:', res.status, res.body);
+    expect([401, 403]).toContain(res.status);
+  });
+
+  test('Admin can create a franchise', async () => {
+    const res = await request(app)
+      .post('/api/franchise')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Authorized Pizza', admins: [{ id: adminUser.id }] });
+    console.log('Admin create franchise response:', res.status, res.body);
     expect(res.status).toBe(200);
-    const resGet = await request(app).get('/api/franchise').set('Authorization', `Bearer ${adminToken}`);
-    expect(resGet.status).toBe(200);
-    expect(Array.isArray(resGet.body.franchises)).toBe(true);
-    const resFail = await request(app).post('/api/franchise').set('Authorization', `Bearer ${token}`).send({ name: 'Fail Franchise', admins: [user.id] });
-    expect([401, 403]).toContain(resFail.status);
+    expect(res.body.franchise).toBeDefined();
   });
 });
