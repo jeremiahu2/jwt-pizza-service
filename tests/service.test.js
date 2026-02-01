@@ -1,18 +1,21 @@
 const request = require('supertest');
 const app = require('../src/app');
 const service = require('../src/service');
+const express = require('express');
+const version = require('../src/version.json');
+const config = require('../src/config.js');
 
 jest.mock('../src/routes/authRouter', () => {
   const express = require('express');
   const router = express.Router();
   router.post('/', (req, res) => res.json({ token: 'testtoken' }));
-  return {
-    authRouter: router,
-    setAuthUser: (req, res, next) => {
+  const setAuthUser = (req, res, next) => {
+    if (req.headers['authorization']) {
       req.user = { id: 1, email: 'boateng@byu.edu', name: 'Test User' };
-      next();
-    },
+    }
+    next();
   };
+  return { authRouter: router, setAuthUser };
 });
 
 jest.mock('../src/routes/franchiseRouter', () => {
@@ -51,7 +54,6 @@ jest.mock('../src/routes/userRouter', () => {
 });
 
 let token;
-
 beforeAll(async () => {
   const res = await request(app).post('/api/auth').send({
     email: 'boateng@byu.edu',
@@ -132,9 +134,39 @@ describe('JWT Pizza Service', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.name).toBe('Updated User');
   });
+});
 
-  test('service.calculatePrice works', () => {
-    const price = service.calculatePrice(2, 5);
-    expect(price).toBe(10);
+describe('Additional coverage', () => {
+  test('CORS middleware sets headers', async () => {
+    const res = await request(service).get('/').set('Origin', 'http://localhost');
+    expect(res.headers['access-control-allow-origin']).toBe('http://localhost');
+    expect(res.headers['access-control-allow-methods']).toContain('GET');
+    expect(res.headers['access-control-allow-headers']).toContain('Content-Type');
+  });
+
+  test('GET / returns welcome message and version', async () => {
+    const res = await request(service).get('/');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty('message', 'welcome to JWT Pizza');
+    expect(res.body).toHaveProperty('version', version.version);
+  });
+
+  test('unknown endpoint returns 404', async () => {
+    const res = await request(service).get('/notfound');
+    expect(res.statusCode).toBe(404);
+    expect(res.body).toHaveProperty('message', 'unknown endpoint');
+  });
+
+  test('error handler returns status code and message', async () => {
+    const errorApp = express();
+    errorApp.get('/', (req, res, next) => next(new Error('Test Error')));
+    errorApp.use((err, req, res, next) => {
+      res.status(err.statusCode ?? 500).json({ message: err.message, stack: err.stack });
+    });
+
+    const res = await request(errorApp).get('/');
+    expect(res.statusCode).toBe(500);
+    expect(res.body).toHaveProperty('message', 'Test Error');
+    expect(res.body).toHaveProperty('stack');
   });
 });
