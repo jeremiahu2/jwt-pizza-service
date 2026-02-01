@@ -1,32 +1,29 @@
 const request = require('supertest');
-const app = require('../src/service');
+const app = require('../src/app');
+const db = require('../src/database/dbModel');
+const service = require('../src/service/service');
+
 let token;
 
 beforeAll(async () => {
   const res = await request(app)
     .post('/api/auth')
-    .send({
-      name: 'Test User',
-      email: process.env.NET_ID,
-      password: process.env.FACTORY_API_KEY,
-    });
-  console.log('Login response:', res.body);
+    .send({ email: 'boateng@byu.edu', password: 'testpass' });
   token = res.body.token;
 });
 
 describe('JWT Pizza Service', () => {
-  test('POST /api/auth returns JWT token', () => {
+  test('POST /api/auth returns JWT token', async () => {
     expect(token).toBeDefined();
     expect(typeof token).toBe('string');
   });
 
   test('GET /api/franchise returns list of franchises when authorized', async () => {
     const res = await request(app)
-    .get('/api/franchise')
-    .set('Authorization', `Bearer ${token}`);
+      .get('/api/franchise')
+      .set('Authorization', `Bearer ${token}`);
     expect(res.statusCode).toBe(200);
-    expect(res.body.franchises).toBeDefined();
-    expect(Array.isArray(res.body.franchises)).toBe(true);
+    expect(Array.isArray(res.body)).toBe(true);
   });
 
   test('GET /api/franchise works without token', async () => {
@@ -34,4 +31,20 @@ describe('JWT Pizza Service', () => {
     expect(res.statusCode).toBe(200);
   });
 
+  test('POST /api/franchise/pizzas adds pizza when authorized', async () => {
+    const newPizza = { name: 'Test Pizza', price: 9.99 };
+    const res = await request(app)
+      .post('/api/franchise/pizzas')
+      .set('Authorization', `Bearer ${token}`)
+      .send(newPizza);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.name).toBe('Test Pizza');
+  });
+
+  test('POST /api/franchise/pizzas fails without token', async () => {
+    const res = await request(app)
+      .post('/api/franchise/pizzas')
+      .send({ name: 'Fail Pizza', price: 5.99 });
+    expect(res.statusCode).toBe(401);
+  });
 });
