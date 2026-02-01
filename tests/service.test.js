@@ -1,7 +1,7 @@
 const request = require('supertest');
 const app = require('../src/index');
 const db = require('../src/database/dbModel');
-const service = require('../src/service/service');
+const service = require('../src/service');
 
 let token;
 
