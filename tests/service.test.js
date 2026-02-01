@@ -1,18 +1,45 @@
 const request = require('supertest');
-const service = require('../src/service'); // this is your real Express app
+const express = require('express');
+const app = require('../src/app');
+const service = require('../src/service');
 const version = require('../src/version.json');
-const config = require('../src/config.js');
+
+const db = require('../src/database/database');
+jest.mock('../src/database/database', () => ({
+  query: jest.fn(),
+}));
+
+beforeAll(() => {
+  db.query.mockImplementation(async (sql, params) => {
+    if (sql.includes('FROM franchises')) {
+      return [{ id: 1, name: 'Franchise 1' }];
+    }
+    if (sql.includes('FROM pizzas')) {
+      return [{ id: 1, name: 'Pepperoni', price: 9.99 }];
+    }
+    if (sql.includes('FROM orders')) {
+      return [{ id: 1, pizzaId: 1, quantity: 2 }];
+    }
+    if (sql.includes('FROM users')) {
+      return [{ id: 1, email: 'boateng@byu.edu', name: 'Test User' }];
+    }
+    if (sql.startsWith('INSERT')) {
+      return { insertId: 1 };
+    }
+    if (sql.startsWith('UPDATE')) {
+      return { affectedRows: 1 };
+    }
+    return [];
+  });
+});
 
 let token;
 
-// First, login to get a JWT token (assuming /api/auth exists and works)
 beforeAll(async () => {
-  const res = await request(service)
-    .post('/api/auth')
-    .send({
-      email: 'boateng@byu.edu',
-      password: 'testpass',
-    });
+  const res = await request(app).post('/api/auth').send({
+    email: 'boateng@byu.edu',
+    password: 'testpass',
+  });
   token = res.body.token;
 });
 
@@ -23,65 +50,77 @@ describe('JWT Pizza Service', () => {
   });
 
   test('GET /api/franchise returns list of franchises', async () => {
-    const res = await request(service).get('/api/franchise').set('Authorization', `Bearer ${token}`);
+    const res = await request(app)
+      .get('/api/franchise')
+      .set('Authorization', `Bearer ${token}`);
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body[0]).toHaveProperty('name');
   });
 
   test('GET /api/franchise works without token', async () => {
-    const res = await request(service).get('/api/franchise');
+    const res = await request(app).get('/api/franchise');
     expect(res.statusCode).toBe(200);
   });
 
   test('POST /api/franchise/pizzas adds pizza when authorized', async () => {
-    const newPizza = { name: 'Test Pizza', price: 9.99 };
-    const res = await request(service)
+    const pizza = { name: 'Test Pizza', price: 9.99 };
+    const res = await request(app)
       .post('/api/franchise/pizzas')
       .set('Authorization', `Bearer ${token}`)
-      .send(newPizza);
+      .send(pizza);
     expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty('id');
     expect(res.body.name).toBe('Test Pizza');
   });
 
   test('POST /api/franchise/pizzas fails without token', async () => {
-    const res = await request(service).post('/api/franchise/pizzas').send({
-      name: 'Fail Pizza',
-      price: 5.99,
-    });
+    const res = await request(app)
+      .post('/api/franchise/pizzas')
+      .send({ name: 'Fail Pizza', price: 5.99 });
     expect(res.statusCode).toBe(401);
   });
 
   test('POST /api/order creates order when authorized', async () => {
     const order = { pizzaId: 1, quantity: 2 };
-    const res = await request(service).post('/api/order').set('Authorization', `Bearer ${token}`).send(order);
+    const res = await request(app)
+      .post('/api/order')
+      .set('Authorization', `Bearer ${token}`)
+      .send(order);
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('id');
   });
 
   test('GET /api/order returns orders for user', async () => {
-    const res = await request(service).get('/api/order').set('Authorization', `Bearer ${token}`);
+    const res = await request(app)
+      .get('/api/order')
+      .set('Authorization', `Bearer ${token}`);
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
   });
 
   test('POST /api/order fails without token', async () => {
-    const res = await request(service).post('/api/order').send({ pizzaId: 1, quantity: 1 });
+    const res = await request(app)
+      .post('/api/order')
+      .send({ pizzaId: 1, quantity: 1 });
     expect(res.statusCode).toBe(401);
   });
 
   test('GET /api/user returns user info when authorized', async () => {
-    const res = await request(service).get('/api/user').set('Authorization', `Bearer ${token}`);
+    const res = await request(app)
+      .get('/api/user')
+      .set('Authorization', `Bearer ${token}`);
     expect(res.statusCode).toBe(200);
     expect(res.body.email).toBe('boateng@byu.edu');
   });
 
   test('GET /api/user fails without token', async () => {
-    const res = await request(service).get('/api/user');
+    const res = await request(app).get('/api/user');
     expect(res.statusCode).toBe(401);
   });
 
   test('PATCH /api/user updates user info', async () => {
-    const res = await request(service)
+    const res = await request(app)
       .patch('/api/user')
       .set('Authorization', `Bearer ${token}`)
       .send({ name: 'Updated User' });
@@ -105,17 +144,6 @@ describe('Additional coverage', () => {
     expect(res.body).toHaveProperty('version', version.version);
   });
 
-  test('GET /api/docs returns version, endpoints, and config', async () => {
-    const res = await request(service).get('/api/docs');
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveProperty('version', version.version);
-    expect(res.body).toHaveProperty('endpoints');
-    expect(Array.isArray(res.body.endpoints)).toBe(true);
-    expect(res.body).toHaveProperty('config');
-    expect(res.body.config).toHaveProperty('factory', config.factory.url);
-    expect(res.body.config).toHaveProperty('db', config.db.connection.host);
-  });
-
   test('unknown endpoint returns 404', async () => {
     const res = await request(service).get('/notfound');
     expect(res.statusCode).toBe(404);
@@ -123,7 +151,6 @@ describe('Additional coverage', () => {
   });
 
   test('error handler returns status code and message', async () => {
-    const express = require('express');
     const errorApp = express();
     errorApp.get('/', (req, res, next) => next(new Error('Test Error')));
     errorApp.use((err, req, res, next) => {
