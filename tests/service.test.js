@@ -1,7 +1,8 @@
 const request = require('supertest');
 const express = require('express');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const app = require('../src/app');
-const service = require('../src/service');
 const version = require('../src/version.json');
 
 const db = require('../src/database/database');
@@ -9,8 +10,14 @@ jest.mock('../src/database/database', () => ({
   query: jest.fn(),
 }));
 
+process.env.JWT_SECRET = 'testsecret';
+
 beforeAll(() => {
   db.query.mockImplementation(async (sql, params) => {
+    if (sql.includes('FROM users') && sql.includes('WHERE email')) {
+      const hashed = await bcrypt.hash('testpass', 1);
+      return [{ id: 1, email: 'boateng@byu.edu', name: 'Test User', password: hashed }];
+    }
     if (sql.includes('FROM franchises')) {
       return [{ id: 1, name: 'Franchise 1' }];
     }
@@ -18,10 +25,7 @@ beforeAll(() => {
       return [{ id: 1, name: 'Pepperoni', price: 9.99 }];
     }
     if (sql.includes('FROM orders')) {
-      return [{ id: 1, pizzaId: 1, quantity: 2 }];
-    }
-    if (sql.includes('FROM users')) {
-      return [{ id: 1, email: 'boateng@byu.edu', name: 'Test User' }];
+      return [{ id: 1, pizzaId: 1, quantity: 2, userId: 1 }];
     }
     if (sql.startsWith('INSERT')) {
       return { insertId: 1 };
@@ -131,21 +135,21 @@ describe('JWT Pizza Service', () => {
 
 describe('Additional coverage', () => {
   test('CORS middleware sets headers', async () => {
-    const res = await request(service).get('/').set('Origin', 'http://localhost');
+    const res = await request(app).get('/').set('Origin', 'http://localhost');
     expect(res.headers['access-control-allow-origin']).toBe('http://localhost');
     expect(res.headers['access-control-allow-methods']).toContain('GET');
     expect(res.headers['access-control-allow-headers']).toContain('Content-Type');
   });
 
   test('GET / returns welcome message and version', async () => {
-    const res = await request(service).get('/');
+    const res = await request(app).get('/');
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty('message', 'welcome to JWT Pizza');
     expect(res.body).toHaveProperty('version', version.version);
   });
 
   test('unknown endpoint returns 404', async () => {
-    const res = await request(service).get('/notfound');
+    const res = await request(app).get('/notfound');
     expect(res.statusCode).toBe(404);
     expect(res.body).toHaveProperty('message', 'unknown endpoint');
   });
@@ -156,7 +160,6 @@ describe('Additional coverage', () => {
     errorApp.use((err, req, res, next) => {
       res.status(err.statusCode ?? 500).json({ message: err.message, stack: err.stack });
     });
-
     const res = await request(errorApp).get('/');
     expect(res.statusCode).toBe(500);
     expect(res.body).toHaveProperty('message', 'Test Error');
