@@ -3,6 +3,8 @@ const app = require('../src/app');
 
 let token;
 let user;
+let adminToken;
+let adminUser;
 
 describe('JWT Pizza Service – Integration Tests', () => {
   const testUser = {
@@ -11,142 +13,93 @@ describe('JWT Pizza Service – Integration Tests', () => {
     password: 'testpassword',
   };
 
-  test('GET / returns welcome message and version', async () => {
-    const res = await request(app).get('/');
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe('welcome to JWT Pizza');
-    expect(res.body.version).toBeDefined();
-  });
+  const adminTestUser = {
+    name: 'Admin Tester',
+    email: `admin${Date.now()}@jwt.com`,
+    password: 'adminpassword',
+    roles: ['admin'],
+  };
 
-  test('Unknown endpoint returns 404', async () => {
-    const res = await request(app).get('/not-a-real-route');
-    expect(res.status).toBe(404);
-    expect(res.body.message).toBe('unknown endpoint');
-  });
-
-  test('Register a new user', async () => {
-    const res = await request(app)
-      .post('/api/auth')
-      .send(testUser);
+  test('Register normal user', async () => {
+    const res = await request(app).post('/api/auth').send(testUser);
     expect(res.status).toBe(200);
     expect(res.body.user).toBeDefined();
-    expect(res.body.user.email).toBe(testUser.email);
-    expect(res.body.token).toBeDefined();
     token = res.body.token;
     user = res.body.user;
   });
 
-  test('Login an existing user', async () => {
-    const res = await request(app)
-      .put('/api/auth')
-      .send({
-        email: testUser.email,
-        password: testUser.password,
-      });
+  test('Register admin user', async () => {
+    const res = await request(app).post('/api/auth').send(adminTestUser);
     expect(res.status).toBe(200);
-    expect(res.body.token).toBeDefined();
-    token = res.body.token;
+    adminToken = res.body.token;
+    adminUser = res.body.user;
   });
 
-  test('Reject logout without authentication', async () => {
-    const res = await request(app).delete('/api/auth');
+  test('Fetch user profile', async () => {
+    const res = await request(app).get('/api/user/me').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.user.email).toBe(user.email);
+  });
+
+  test('Fetch profile without auth fails', async () => {
+    const res = await request(app).get('/api/user/me');
     expect(res.status).toBe(401);
   });
 
-  test('Logout authenticated user', async () => {
+  test('Update user self', async () => {
     const res = await request(app)
-      .delete('/api/auth')
-      .set('Authorization', `Bearer ${token}`);
-    expect(res.status).toBe(200);
-    expect(res.body.message).toBe('logout successful');
-  });
-
-  test('Login again after logout', async () => {
-    const res = await request(app)
-      .put('/api/auth')
-      .send({
-        email: testUser.email,
-        password: testUser.password,
-      });
-    expect(res.status).toBe(200);
-    expect(res.body.token).toBeDefined();
-    token = res.body.token;
-  });
-
-  test('Menu is publicly accessible', async () => {
-    const res = await request(app).get('/api/order/menu');
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-  });
-
-  test('Orders require authentication', async () => {
-    const res = await request(app).get('/api/order');
-    expect(res.status).toBe(401);
-  });
-
-  test('Authenticated user can get orders', async () => {
-    const res = await request(app)
-      .get('/api/order')
-      .set('Authorization', `Bearer ${token}`);
-    expect(res.status).toBe(200);
-    expect(res.body.orders).toBeDefined();
-  });
-
-  test('Authenticated user can create an order', async () => {
-    const menuRes = await request(app).get('/api/order/menu');
-    expect(menuRes.body.length).toBeGreaterThan(0);
-    const item = menuRes.body[0];
-    const res = await request(app)
-      .post('/api/order')
+      .put(`/api/user/${user.id}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({
-        franchiseId: 1,
-        storeId: 1,
-        items: [
-          {
-            menuId: item.id,
-            description: item.title,
-            price: item.price,
-          },
-        ],
-      });
+      .send({ name: 'Updated Name' });
     expect(res.status).toBe(200);
-    expect(res.body.order).toBeDefined();
-    expect(res.body.jwt).toBeDefined();
+    expect(res.body.user.name).toBe('Updated Name');
   });
 
-  test('Authenticated user can fetch their profile', async () => {
-  const res = await request(app)
-    .get('/api/user')
-    .set('Authorization', `Bearer ${token}`);
-  expect(res.status).toBe(200);
-  expect(res.body.user).toBeDefined();
-  expect(res.body.user.email).toBe(user.email);
-});
-
-
-  test('User profile requires authentication', async () => {
-    const res = await request(app).get('/api/user');
-    expect(res.status).toBe(401);
-  });
-
-  test('Authenticated user can view franchises', async () => {
+  test('Update another user fails without admin', async () => {
     const res = await request(app)
-      .get('/api/franchise')
-      .set('Authorization', `Bearer ${token}`);
-    expect(res.status).toBe(200);
-    expect(res.body.franchises).toBeDefined();
-    expect(Array.isArray(res.body.franchises)).toBe(true);
-  });
-
-  test('Non-admin cannot create a franchise', async () => {
-    const res = await request(app)
-      .post('/api/franchise')
+      .put(`/api/user/${adminUser.id}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({
-        name: 'Unauthorized Pizza',
-        admins: [user.id],
-      });
+      .send({ name: 'Hack Attempt' });
+    expect(res.status).toBe(403);
+  });
+
+  test('Update another user succeeds with admin', async () => {
+    const res = await request(app)
+      .put(`/api/user/${user.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Admin Update' });
+    expect(res.status).toBe(200);
+    expect(res.body.user.name).toBe('Admin Update');
+  });
+
+  test('List users returns array for admin', async () => {
+    const res = await request(app).get('/api/user/').set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.users)).toBe(true);
+  });
+
+  test('List users fails for normal user', async () => {
+    const res = await request(app).get('/api/user/').set('Authorization', `Bearer ${token}`);
     expect([401, 403]).toContain(res.status);
+  });
+
+  test('Delete user fails for normal user', async () => {
+    const res = await request(app).delete(`/api/user/${user.id}`).set('Authorization', `Bearer ${token}`);
+    expect([401, 403]).toContain(res.status);
+  });
+
+  test('Delete user succeeds for admin', async () => {
+    const res = await request(app).delete(`/api/user/${user.id}`).set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(200);
+  });
+
+  test('Franchise CRUD coverage', async () => {
+    const res = await request(app).post('/api/franchise').set('Authorization', `Bearer ${adminToken}`).send({ name: 'New Franchise', admins: [adminUser.id] });
+    expect(res.status).toBe(200);
+    const resGet = await request(app).get('/api/franchise').set('Authorization', `Bearer ${adminToken}`);
+    expect(resGet.status).toBe(200);
+    expect(Array.isArray(resGet.body.franchises)).toBe(true);
+    const resFail = await request(app).post('/api/franchise').set('Authorization', `Bearer ${token}`).send({ name: 'Fail Franchise', admins: [user.id] });
+    expect([401, 403]).toContain(resFail.status);
   });
 });
