@@ -2,12 +2,11 @@ const express = require('express');
 const { DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { StatusCodeError, asyncHandler } = require('../endpointHelper.js');
-
 const franchiseRouter = express.Router();
 
 function isAdmin(user) {
-  const roles = user.roles || [];
-  return roles.map(r => r.toLowerCase()).includes('admin');
+  if (!user || !Array.isArray(user.roles)) return false;
+  return user.roles.some(r => r?.role?.toLowerCase() === 'admin');
 }
 
 franchiseRouter.get(
@@ -25,7 +24,7 @@ franchiseRouter.get(
   asyncHandler(async (req, res) => {
     const userId = Number(req.params.userId);
     let result = [];
-    if (req.user.id === userId || isAdmin(req.user)) {
+    if (Number(req.user.id) === userId || isAdmin(req.user)) {
       result = await DB.getUserFranchises(userId);
     }
     res.status(200).json(result);
@@ -43,7 +42,6 @@ franchiseRouter.post(
     } else {
       franchise.admins = [{ id: req.user.id }];
     }
-
     const created = await DB.createFranchise(franchise);
     res.status(200).json({ franchise: created });
   })
@@ -67,7 +65,7 @@ franchiseRouter.post(
     const franchiseId = Number(req.params.franchiseId);
     const franchise = await DB.getFranchise({ id: franchiseId });
     if (!franchise) throw new StatusCodeError('franchise not found', 404);
-    if (!isAdmin(req.user) && !franchise.admins.some(a => a.id === req.user.id)) {
+    if (!isAdmin(req.user) && !franchise.admins.some(a => Number(a.id) === Number(req.user.id))) {
       throw new StatusCodeError('unable to create a store', 403);
     }
     const store = await DB.createStore(franchise.id, req.body);
@@ -82,7 +80,7 @@ franchiseRouter.delete(
     const franchiseId = Number(req.params.franchiseId);
     const franchise = await DB.getFranchise({ id: franchiseId });
     if (!franchise) throw new StatusCodeError('franchise not found', 404);
-    if (!isAdmin(req.user) && !franchise.admins.some(a => a.id === req.user.id)) {
+    if (!isAdmin(req.user) && !franchise.admins.some(a => Number(a.id) === Number(req.user.id))) {
       throw new StatusCodeError('unable to delete a store', 403);
     }
     const storeId = Number(req.params.storeId);

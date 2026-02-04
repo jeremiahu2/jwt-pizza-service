@@ -5,8 +5,8 @@ const { authRouter, setAuth } = require('./authRouter.js');
 const userRouter = express.Router();
 
 function isAdmin(user) {
-  const roles = user.roles || [];
-  return roles.map(r => r.toLowerCase()).includes('admin');
+  if (!user || !Array.isArray(user.roles)) return false;
+  return user.roles.some(r => r?.role?.toLowerCase() === 'admin');
 }
 
 userRouter.get(
@@ -33,7 +33,8 @@ userRouter.put(
   asyncHandler(async (req, res) => {
     const { name, email, password, roles } = req.body;
     const userId = Number(req.params.userId);
-    if (req.user.id !== userId && !isAdmin(req.user)) return res.status(403).json({ message: 'unauthorized' });
+    if (Number(req.user.id) !== userId && !isAdmin(req.user))
+      return res.status(403).json({ message: 'unauthorized' });
     const updatedUser = await DB.updateUser(userId, name, email, password, roles || []);
     const auth = await setAuth(updatedUser);
     res.status(200).json({ user: updatedUser, token: auth });

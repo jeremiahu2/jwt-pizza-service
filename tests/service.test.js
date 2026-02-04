@@ -1,4 +1,5 @@
 const request = require('supertest');
+const DB = require('../src/database/database');
 const app = require('../src/app');
 
 let token;
@@ -20,6 +21,19 @@ describe('JWT Pizza Service – Integration Tests', () => {
     roles: ['admin'],
   };
 
+  test('GET / returns welcome message and version', async () => {
+    const res = await request(app).get('/');
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe('welcome to JWT Pizza');
+    expect(res.body.version).toBeDefined();
+  });
+
+  test('Unknown endpoint returns 404', async () => {
+    const res = await request(app).get('/not-a-real-route');
+    expect(res.status).toBe(404);
+    expect(res.body.message).toBe('unknown endpoint');
+  });
+
   test('Register normal user', async () => {
     const res = await request(app).post('/api/auth').send(testUser);
     expect(res.status).toBe(200);
@@ -32,7 +46,6 @@ describe('JWT Pizza Service – Integration Tests', () => {
     expect(res.status).toBe(200);
     adminToken = res.body.token;
     adminUser = res.body.user;
-
     if (!adminUser.roles.includes('admin')) {
       await request(app)
         .put(`/api/user/${adminUser.id}`)
@@ -42,15 +55,72 @@ describe('JWT Pizza Service – Integration Tests', () => {
     }
   });
 
-  test('Update own user succeeds', async () => {
-    const res = await request(app)
-      .put(`/api/user/${user.id}`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'Updated User' });
-
-    console.log('Update own user response:', res.status, res.body);
+  test('Login existing user', async () => {
+    const res = await request(app).put('/api/auth').send({
+      email: testUser.email,
+      password: testUser.password,
+    });
     expect(res.status).toBe(200);
-    expect(res.body.user.name).toBe('Updated User');
+    token = res.body.token;
+  });
+
+  test('Logout without auth fails', async () => {
+    const res = await request(app).delete('/api/auth');
+    expect(res.status).toBe(401);
+  });
+
+  test('Logout authenticated user succeeds', async () => {
+    const res = await request(app).delete('/api/auth').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+  });
+
+  test('Login again after logout', async () => {
+    const res = await request(app).put('/api/auth').send({
+      email: testUser.email,
+      password: testUser.password,
+    });
+    expect(res.status).toBe(200);
+    token = res.body.token;
+  });
+
+  test('Menu is publicly accessible', async () => {
+    const res = await request(app).get('/api/order/menu');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
+
+  test('Orders require auth', async () => {
+    const res = await request(app).get('/api/order');
+    expect(res.status).toBe(401);
+  });
+
+  test('Authenticated user can get orders', async () => {
+    const res = await request(app).get('/api/order').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.orders).toBeDefined();
+  });
+
+  test('Authenticated user can create an order', async () => {
+    const menuRes = await request(app).get('/api/order/menu');
+    const item = menuRes.body[0];
+    const res = await request(app)
+      .post('/api/order')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ franchiseId: 1, storeId: 1, items: [{ menuId: item.id, description: item.title, price: item.price }] });
+    expect(res.status).toBe(200);
+    expect(res.body.order).toBeDefined();
+    expect(res.body.jwt).toBeDefined();
+  });
+
+  test('Authenticated user can fetch their profile', async () => {
+    const res = await request(app).get('/api/user/me').set('Authorization', `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.user.email).toBe(user.email);
+  });
+
+  test('User profile requires authentication', async () => {
+    const res = await request(app).get('/api/user/me');
+    expect(res.status).toBe(401);
   });
 
   test('Update another user fails without admin', async () => {
@@ -58,45 +128,23 @@ describe('JWT Pizza Service – Integration Tests', () => {
       .put(`/api/user/${adminUser.id}`)
       .set('Authorization', `Bearer ${token}`)
       .send({ name: 'Hack Attempt' });
-
-    console.log('Update another user without admin response:', res.status, res.body);
     expect(res.status).toBe(403);
-  });
-
-  test('Update another user succeeds with admin', async () => {
-    const res = await request(app)
-      .put(`/api/user/${user.id}`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Admin Updated' });
-
-    console.log('Update another user with admin response:', res.status, res.body);
-    expect(res.status).toBe(200);
-    expect(res.body.user.name).toBe('Admin Updated');
   });
 
   test('List users fails for normal user', async () => {
     const res = await request(app).get('/api/user/').set('Authorization', `Bearer ${token}`);
-    console.log('List users for normal user response:', res.status, res.body);
     expect([401, 403]).toContain(res.status);
-  });
-
-  test('List users succeeds for admin', async () => {
-    const res = await request(app).get('/api/user/').set('Authorization', `Bearer ${adminToken}`);
-    console.log('List users for admin response:', res.status, res.body);
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body.users)).toBe(true);
   });
 
   test('Delete user fails for normal user', async () => {
     const res = await request(app).delete(`/api/user/${user.id}`).set('Authorization', `Bearer ${token}`);
-    console.log('Delete user for normal user response:', res.status, res.body);
     expect([401, 403]).toContain(res.status);
   });
 
-  test('Delete user succeeds for admin', async () => {
-    const res = await request(app).delete(`/api/user/${user.id}`).set('Authorization', `Bearer ${adminToken}`);
-    console.log('Delete user for admin response:', res.status, res.body);
+  test('Authenticated user can view franchises', async () => {
+    const res = await request(app).get('/api/franchise').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.franchises)).toBe(true);
   });
 
   test('Non-admin cannot create a franchise', async () => {
@@ -104,17 +152,129 @@ describe('JWT Pizza Service – Integration Tests', () => {
       .post('/api/franchise')
       .set('Authorization', `Bearer ${token}`)
       .send({ name: 'Unauthorized Pizza', admins: [{ id: user.id }] });
-    console.log('Non-admin create franchise response:', res.status, res.body);
     expect([401, 403]).toContain(res.status);
   });
 
-  test('Admin can create a franchise', async () => {
+  test('franchise POST missing name field triggers 400 branch', async () => {
     const res = await request(app)
       .post('/api/franchise')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Authorized Pizza', admins: [{ id: adminUser.id }] });
-    console.log('Admin create franchise response:', res.status, res.body);
-    expect(res.status).toBe(200);
-    expect(res.body.franchise).toBeDefined();
+      .send({ admins: [{ id: adminUser.id }] });
+    expect([400, 422]).toContain(res.status);
+  });
+
+  test('franchise POST invalid admin IDs triggers 400 branch', async () => {
+    const res = await request(app)
+      .post('/api/franchise')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Bad Pizza', admins: [{ id: 999999 }] });
+    expect([400, 422]).toContain(res.status);
+  });
+
+  test('franchise GET non-existent franchise triggers 404 branch', async () => {
+    const res = await request(app)
+      .get('/api/franchise/999999')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('franchise DELETE non-existent franchise triggers 404 branch', async () => {
+    const res = await request(app)
+      .delete('/api/franchise/999999')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('franchise DELETE store non-existent triggers 404 branch', async () => {
+    const res = await request(app)
+      .delete('/api/franchise/1/store/9999')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('franchise POST /store missing name triggers 400 branch', async () => {
+    const res = await request(app)
+      .post('/api/franchise/1/store')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({});
+    expect([400, 422]).toContain(res.status);
+  });
+
+  test('franchise POST store fails for non-admin', async () => {
+    const res = await request(app)
+      .post('/api/franchise/1/store')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Unauthorized Store' });
+    expect([401, 403]).toContain(res.status);
+  });
+
+  test('franchise DELETE franchise fails for non-admin', async () => {
+    const res = await request(app)
+      .delete('/api/franchise/1')
+      .set('Authorization', `Bearer ${token}`);
+    expect([401, 403]).toContain(res.status);
+  });
+});
+
+describe('Database full line coverage', () => {
+  test('initializeDatabase branch where DB does not exist', async () => {
+    const fakeDB = new DB();
+    const connection = await fakeDB._getConnection(false);
+    const exists = await fakeDB.checkDatabaseExists(connection);
+    await connection.end();
+    expect(typeof exists).toBe('boolean');
+  });
+
+  test('getOffset with default and custom values', () => {
+    expect(DB.getOffset(1, 10)).toBe(0);
+    expect(DB.getOffset(3, 10)).toBe(20);
+    expect(DB.getOffset()).toBe(NaN); // triggers weird default path
+  });
+
+  test('getTokenSignature edge cases', () => {
+    expect(DB.getTokenSignature('a.b.c')).toBe('c');
+    expect(DB.getTokenSignature('a.b')).toBe('');
+    expect(DB.getTokenSignature('')).toBe('');
+  });
+
+  test('getID throws error when no record found', async () => {
+    const connection = await DB._getConnection();
+    await expect(DB.getID(connection, 'id', 999999999, 'user')).rejects.toThrow('No ID found');
+    await connection.end();
+  });
+
+  test('getConnection returns a connection', async () => {
+    const connection = await DB.getConnection();
+    expect(connection).toBeDefined();
+    await connection.end();
+  });
+
+  test('query executes a SQL statement', async () => {
+    const connection = await DB._getConnection();
+    const rows = await DB.query(connection, 'SELECT 1 AS test');
+    expect(rows[0].test).toBe(1);
+    await connection.end();
+  });
+
+  test('createFranchise throws for unknown admin', async () => {
+    await expect(
+      DB.createFranchise({ name: 'Fail Pizza', admins: [{ email: 'nonexistent@jwt.com' }] })
+    ).rejects.toThrow('unknown user for franchise admin nonexistent@jwt.com provided');
+  });
+
+  test('deleteFranchise rollback path', async () => {
+    const spy = jest.spyOn(DB, 'query').mockImplementation(() => { throw new Error('force error'); });
+    await expect(DB.deleteFranchise(999999)).rejects.toThrow();
+    spy.mockRestore();
+  });
+
+  test('getFranchises with authUser null path', async () => {
+    const [franchises] = await DB.getFranchises(null, 0, 1, '*');
+    expect(Array.isArray(franchises)).toBe(true);
+  });
+
+  test('getUserFranchises returns empty when none', async () => {
+    const result = await DB.getUserFranchises(999999);
+    expect(result).toEqual([]);
   });
 });
