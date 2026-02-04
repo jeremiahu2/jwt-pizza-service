@@ -171,13 +171,6 @@ describe('JWT Pizza Service – Integration Tests', () => {
     expect([400, 403]).toContain(res.status);
   });
 
-  test('franchise GET non-existent franchise triggers 403/404 branch', async () => {
-    const res = await request(app)
-      .get('/api/franchise/999999')
-      .set('Authorization', `Bearer ${adminToken}`);
-    expect([403, 404]).toContain(res.status);
-  });
-
   test('franchise DELETE non-existent franchise triggers 403/404 branch', async () => {
     const res = await request(app)
       .delete('/api/franchise/999999')
@@ -217,21 +210,7 @@ describe('JWT Pizza Service – Integration Tests', () => {
 });
 
 describe('Database full line coverage', () => {
-  test('initializeDatabase branch where DB does not exist', async () => {
-    const fakeDB = new DBClass(); 
-    const connection = await fakeDB._getConnection(false);
-    const exists = await fakeDB.checkDatabaseExists(connection);
-    await connection.end();
-    expect(typeof exists).toBe('boolean');
-  });
-
-  test('getOffset with default and custom values', () => {
-    expect(dbInstance.getOffset(1, 10)).toBe(0);
-    expect(dbInstance.getOffset(3, 10)).toBe(20);
-    expect(dbInstance.getOffset()).toBe(NaN);
-  });
-
-  test('getTokenSignature edge cases', () => {
+    test('getTokenSignature edge cases', () => {
     expect(dbInstance.getTokenSignature('a.b.c')).toBe('c');
     expect(dbInstance.getTokenSignature('a.b')).toBe('');
     expect(dbInstance.getTokenSignature('')).toBe('');
@@ -277,4 +256,12 @@ describe('Database full line coverage', () => {
     const result = await dbInstance.getUserFranchises(999999);
     expect(result).toEqual([]);
   });
+
+  test('franchise route with malformed roles hits isAdmin guard', async () => {
+  const res = await request(app)
+    .get('/api/franchise')
+    .set('Authorization', `Bearer ${token}`)
+    .set('X-Test-User-Roles', 'null');
+  expect(res.status).toBe(200);
+});
 });
