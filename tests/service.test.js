@@ -8,6 +8,13 @@ let adminToken;
 let adminUser;
 
 describe('JWT Pizza Service – Integration Tests', () => {
+  describe('Database class existence', () => {
+    test('DBClass can be instantiated', () => {
+      const _db = new DBClass();
+      expect(_db).toBeDefined();
+    });
+  });
+  
   const testUser = {
     name: 'Service Tester',
     email: `tester${Date.now()}@jwt.com`,
@@ -265,5 +272,3 @@ describe('Database full line coverage', () => {
   expect(res.status).toBe(200);
 });
 });
-
-//test
