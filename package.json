@@ -29,8 +29,13 @@
       "node": true,
       "jest": true
     },
+    "globals": {
+      "describe": "readonly",
+      "test": "readonly",
+      "expect": "readonly"
+    },
     "rules": {
-      "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+      "no-unused-vars": ["warn", { "argsIgnorePattern": "^_|next" }],
       "no-empty": ["warn"]
     }
   }
