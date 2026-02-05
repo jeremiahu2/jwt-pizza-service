@@ -1,5 +1,3 @@
-/* eslint-env jest */
-
 const request = require('supertest');
 const { DB: dbInstance, DB: DBClass } = require('../src/database/database'); // import both instance and class
 const app = require('../src/app');
