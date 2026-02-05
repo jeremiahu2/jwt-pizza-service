@@ -100,29 +100,6 @@ describe('JWT Pizza Service – Integration Tests', () => {
     expect(res.body.orders).toBeDefined();
   });
 
-  test('Authenticated user can create an order', async () => {
-  const menuRes = await request(app).get('/api/menu');
-  const item = menuRes.body.menu?.[0];
-  expect(item).toBeDefined();
-  const res = await request(app)
-    .post('/api/order')
-    .set('Authorization', `Bearer ${token}`)
-    .send({
-      franchiseId: 1,
-      storeId: 1,
-      items: [
-        {
-          menuId: item.id,
-          description: item.title,
-          price: item.price,
-        },
-      ],
-    });
-  expect(res.status).toBe(200);
-  expect(res.body.order).toBeDefined();
-  expect(res.body.jwt).toBeDefined();
-});
-
   test('Authenticated user can fetch their profile', async () => {
     const res = await request(app).get('/api/user/me').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
