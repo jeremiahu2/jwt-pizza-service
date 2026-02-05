@@ -103,7 +103,9 @@ if (process.env.NODE_ENV === 'test') {
       layer.route.stack.forEach(h => {
         try {
           h.handle(req, res, () => {});
-        } catch (_err) {}
+        } catch (err) {
+          console.error(err);
+        }
       });
     }
   });
