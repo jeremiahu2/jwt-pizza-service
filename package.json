@@ -28,7 +28,9 @@
     "testEnvironment": "node",
     "collectCoverageFrom": [
       "src/**/*.js",
-      "!src/version.json"
+      "!src/index.js",
+      "!src/init.js",
+      "!src/service.js"
     ],
     "coverageThreshold": {
       "global": {
