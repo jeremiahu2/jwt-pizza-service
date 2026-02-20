@@ -1,6 +1,7 @@
 const request = require('supertest');
-const { DB: dbInstance, DB: DBClass } = require('../src/database/database'); // import both instance and class
+const { DB: dbInstance } = require('../src/database/database');
 const app = require('../src/app');
+const { setAuth } = require('../src/routes/authRouter.js');
 
 let token;
 let user;
@@ -198,7 +199,7 @@ describe('JWT Pizza Service – Integration Tests', () => {
 });
 
 describe('Database full line coverage', () => {
-    test('getTokenSignature edge cases', () => {
+  test('getTokenSignature edge cases', () => {
     expect(dbInstance.getTokenSignature('a.b.c')).toBe('c');
     expect(dbInstance.getTokenSignature('a.b')).toBe('');
     expect(dbInstance.getTokenSignature('')).toBe('');
@@ -250,6 +251,51 @@ describe('Database full line coverage', () => {
     .get('/api/franchise')
     .set('Authorization', `Bearer ${token}`)
     .set('X-Test-User-Roles', 'null');
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('User Functionality', () => {
+  test('list users unauthorized', async () => {
+    const listUsersRes = await request(app).get('/api/user');
+    expect(listUsersRes.status).toBe(401);
+  });
+
+test('list users non-admin', async () => {
+  const [user, token] = await registerUser(request(app));
+  const res = await request(app)
+    .get('/api/user')
+    .set('Authorization', 'Bearer ' + token);
+  expect(res.status).toBe(403);
+});
+
+test('list users as admin', async () => {
+  const admin = await dbInstance.addUser({
+    name: 'admin',
+    email: 'admin@test.com',
+    password: 'a',
+    roles: [{ role: 'admin' }],
+  });
+  const token = await setAuth(admin);
+  const res = await request(app)
+    .get('/api/user')
+    .set('Authorization', 'Bearer ' + token);
+  console.log(res.body);
   expect(res.status).toBe(200);
 });
+
+async function registerUser(service) {
+  const testUser = {
+    name: 'pizza diner',
+    email: `${randomName()}@test.com`,
+    password: 'a',
+  };
+  const registerRes = await service.post('/api/auth').send(testUser);
+  registerRes.body.user.password = testUser.password;
+  return [registerRes.body.user, registerRes.body.token];
+}
+
+function randomName() {
+  return Math.random().toString(36).substring(2, 12);
+}
 });

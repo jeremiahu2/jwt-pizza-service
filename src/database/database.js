@@ -99,6 +99,24 @@ class DB {
     }
   }
 
+  async listUsers(page = 1, limit = 10, nameFilter = '*') {
+    const connection = await this.getConnection();
+    try {
+      const offset = (page - 1) * limit;
+      nameFilter = nameFilter.replace(/\*/g, '%');
+      const sql = `
+        SELECT id, name, email 
+        FROM user 
+        WHERE name LIKE ?
+        LIMIT ${Number(limit)} OFFSET ${Number(offset)}
+      `;
+      const users = await this.query(connection, sql, [nameFilter]);
+      return users;
+    } finally {
+      connection.end();
+    }
+  }
+
   async loginUser(userId, token) {
     token = this.getTokenSignature(token);
     const connection = await this.getConnection();

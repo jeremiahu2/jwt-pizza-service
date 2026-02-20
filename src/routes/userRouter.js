@@ -21,6 +21,7 @@ userRouter.get(
   '/',
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
+    console.log(req.user);
     if (!isAdmin(req.user)) return res.status(403).json({ message: 'forbidden' });
     const users = await DB.listUsers();
     res.status(200).json({ users });
@@ -50,5 +51,24 @@ userRouter.delete(
     res.status(200).json({ message: 'user deleted' });
   })
 );
+
+userRouter.docs = [
+  {
+    method: 'GET',
+    path: '/api/user?page=1&limit=10&name=*',
+    requiresAuth: true,
+    description: 'Gets a list of users',
+    response: {
+      users: [
+        {
+          id: 1,
+          name: '常用名字',
+          email: 'a@jwt.com',
+          roles: [{ role: 'admin' }],
+        },
+      ],
+    },
+  },
+];
 
 module.exports = userRouter;

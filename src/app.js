@@ -10,7 +10,8 @@ const app = express();
 app.use(express.json());
 app.use(cors({
   origin: true,
-  methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT',  'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(setAuthUser);
