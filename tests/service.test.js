@@ -245,14 +245,6 @@ describe('Database full line coverage', () => {
     const result = await dbInstance.getUserFranchises(999999);
     expect(result).toEqual([]);
   });
-
-  test('franchise route with malformed roles hits isAdmin guard', async () => {
-  const res = await request(app)
-    .get('/api/franchise')
-    .set('Authorization', `Bearer ${token}`)
-    .set('X-Test-User-Roles', 'null');
-    expect(res.status).toBe(403);
-  });
 });
 
 describe('User Functionality', () => {

@@ -46,9 +46,19 @@ userRouter.delete(
   '/:userId',
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-    if (!isAdmin(req.user)) return res.status(403).json({ message: 'forbidden' });
-    await DB.deleteUser(Number(req.params.userId));
-    res.status(200).json({ message: 'user deleted' });
+    try {
+      console.log("DELETE hit");
+      console.log("Params:", req.params);
+      console.log("User:", req.user);
+      if (!isAdmin(req.user)) {
+        return res.status(403).json({ message: 'forbidden' });
+      }
+      await DB.deleteUser(Number(req.params.userId));
+      res.status(200).json({ message: 'user deleted' });
+    } catch (err) {
+      console.error("DELETE ERROR:", err);
+      res.status(500).json({ message: err.message });
+    }
   })
 );
 

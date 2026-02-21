@@ -19,6 +19,16 @@ class DB {
     }
   }
 
+  async deleteUser(id) {
+    const connection = await this.getConnection();
+    try {
+      await this.query(connection, 'DELETE FROM userrole WHERE userId=?', [id]);
+      await this.query(connection, 'DELETE FROM user WHERE id=?', [id]);
+    } finally {
+      connection.end();
+    }
+  }
+
   async addMenuItem(item) {
     const connection = await this.getConnection();
     try {
@@ -325,7 +335,6 @@ class DB {
   }
 
   async getConnection() {
-    // Make sure the database is initialized before trying to get a connection.
     await this.initialized;
     return this._getConnection();
   }
