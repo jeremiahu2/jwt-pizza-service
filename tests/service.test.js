@@ -274,9 +274,28 @@ test('list users as admin', async () => {
     .set('Authorization', 'Bearer ' + token);
   console.log(res.body);
   expect(res.status).toBe(200);
+  expect(Array.isArray(res.body.users)).toBe(true);
+  expect(res.body.users.length).toBeGreaterThan(0);
 });
 
-
+test('admin can delete user', async () => {
+  const loginRes = await request(app).put('/api/auth').send({
+    email: 'a@jwt.com',
+    password: 'admin'
+  });
+  const adminToken = loginRes.body.token;
+  const userRes = await request(app).post('/api/auth').send({
+    name: 'Delete Me',
+    email: `delete${Date.now()}@test.com`,
+    password: 'password',
+    roles: [{ role: 'diner' }]
+  });
+  const userId = userRes.body.user.id;
+  const deleteRes = await request(app)
+    .delete(`/api/user/${userId}`)
+    .set('Authorization', `Bearer ${adminToken}`);
+  expect(deleteRes.status).toBe(200);
+});
 
 async function registerUser(service) {
   const testUser = {
