@@ -276,6 +276,8 @@ test('list users as admin', async () => {
   expect(res.status).toBe(200);
 });
 
+
+
 async function registerUser(service) {
   const testUser = {
     name: 'pizza diner',

@@ -21,9 +21,13 @@ userRouter.get(
   '/',
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-    console.log(req.user);
-    if (!isAdmin(req.user)) return res.status(403).json({ message: 'forbidden' });
-    const users = await DB.listUsers();
+    if (!isAdmin(req.user)) {
+      return res.status(403).json({ message: 'forbidden' });
+    }
+    const page = parseInt(req.query.page) || 0;
+    const limit = parseInt(req.query.limit) || 10;
+    const nameFilter = req.query.name || '*';
+    const users = await DB.listUsers(page + 1, limit, nameFilter);
     res.status(200).json({ users });
   })
 );
