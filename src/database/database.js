@@ -374,28 +374,12 @@ class DB {
         for (const statement of dbModel.tableCreateStatements) {
           await connection.query(statement);
         }
-
-        const adminEmail = 'a@jwt.com';
-        const [rows] = await connection.query(
-          'SELECT id FROM user WHERE email=?',
-          [adminEmail]
-        );
-        if (rows.length === 0) {
-          const bcrypt = require('bcrypt');
-          const hashedPassword = await bcrypt.hash('admin', 10);
-          await connection.query(
-            'INSERT INTO user (name, email, password) VALUES (?, ?, ?)',
-            ['常用名字', adminEmail, hashedPassword]
-          );
-          const [userRows] = await connection.query(
-            'SELECT id FROM user WHERE email=?',
-            [adminEmail]
-          );
-          await connection.query(
-            "INSERT INTO userRole (userId, role, objectId) VALUES (?, 'admin', 0)",
-            [userRows[0].id]
-          );
-        }
+        await this.addUser({
+            name: '常用名字',
+            email: adminEmail,
+            password: 'admin',
+            roles: [{ role: Role.Admin }]
+          });
       } finally {
         connection.end();
       }
