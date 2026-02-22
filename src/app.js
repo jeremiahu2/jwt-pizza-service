@@ -8,6 +8,38 @@ const version = require('./version.json');
 const app = express();
 
 app.use(express.json());
+app.post('/debug/seed-admin', async (req, res, next) => {
+  try {
+    const db = require('./database/database.js').DB;
+    const bcrypt = require('bcrypt');
+    const email = 'testAdmin@jwt.com';
+    const password = 'admin';
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const connection = await db.getConnection();
+    const [users] = await connection.execute(
+      'SELECT id FROM user WHERE email=?',
+      [email]
+    );
+    let userId;
+    if (users.length === 0) {
+      const result = await connection.execute(
+        'INSERT INTO user (name, email, password) VALUES (?, ?, ?)',
+        ['Admin', email, hashedPassword]
+      );
+      userId = result[0].insertId;
+    } else {
+      userId = users[0].id;
+    }
+    await connection.execute(
+      "INSERT INTO userRole (userId, role, objectId) VALUES (?, 'admin', 0) ON DUPLICATE KEY UPDATE role='admin'",
+      [userId]
+    );
+    connection.end();
+    res.json({ message: 'admin seeded' });
+  } catch (err) {
+    next(err);
+  }
+});
 app.use(cors({
   origin: true,
   credentials: true,
