@@ -377,19 +377,12 @@ class DB {
           [adminEmail]
         );
         if (rows.length === 0) {
-          await connection.query(
-            'INSERT INTO user (name, email, password) VALUES (?, ?, ?)',
-            ['常用名字', adminEmail, 'admin']
-          );
-          const [userRows] = await connection.query(
-            'SELECT id FROM user WHERE email=?',
-            [adminEmail]
-          );
-          const adminId = userRows[0].id;
-          await connection.query(
-            "INSERT INTO userRole (userId, role, objectId) VALUES (?, 'admin', 0)",
-            [adminId]
-          );
+          await this.addUser({
+            name: '常用名字',
+            email: adminEmail,
+            password: 'admin',
+            roles: [{ role: Role.Admin }]
+          });
         }
       } finally {
         connection.end();
