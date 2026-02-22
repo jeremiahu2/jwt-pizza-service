@@ -1,5 +1,3 @@
-jest.setTimeout(30000);
-
 const request = require('supertest');
 const { DB: dbInstance } = require('../src/database/database');
 const app = require('../src/app');
@@ -313,10 +311,4 @@ async function registerUser(service) {
 function randomName() {
   return Math.random().toString(36).substring(2, 12);
 }
-});
-
-afterAll(async () => {
-  const db = require('../src/database/database').DB;
-  const connection = await db.getConnection();
-  await connection.end();
 });
