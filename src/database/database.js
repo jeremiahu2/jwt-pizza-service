@@ -24,6 +24,10 @@ class DB {
     try {
       await this.query(connection, 'DELETE FROM userrole WHERE userId=?', [id]);
       await this.query(connection, 'DELETE FROM user WHERE id=?', [id]);
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
     } finally {
       connection.end();
     }
