@@ -376,7 +376,7 @@ class DB {
         }
         await this.addUser({
             name: '常用名字',
-            email: adminEmail,
+            email: 'admin@jwt.com',
             password: 'admin',
             roles: [{ role: Role.Admin }]
           });
