@@ -5,6 +5,7 @@ const franchiseRouter = require('./routes/franchiseRouter');
 const orderRouter = require('./routes/orderRouter');
 const userRouter = require('./routes/userRouter');
 const version = require('./version.json');
+const metrics = require('./metrics');
 const app = express();
 
 app.use(express.json());
@@ -29,5 +30,6 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   res.status(err.statusCode ?? 500).json({ message: err.message, stack: err.stack });
 });
+app.use(metrics.requestTracker);
 
 module.exports = app;
