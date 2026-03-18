@@ -62,6 +62,8 @@ authRouter.post(
       return res.status(400).json({ message: 'name, email, and password are required' });
     }
     const user = await DB.addUser({ name, email, password, roles: [{ role: Role.Diner }] });
+    metrics.trackAuth(true);
+    metrics.userLogin();
     const auth = await setAuth(user);
     res.json({ user, token: auth });
   })
@@ -72,6 +74,12 @@ authRouter.put(
   asyncHandler(async (req, res) => {
     const { email, password } = req.body;
     const user = await DB.getUser(email, password);
+    if (!user) {
+      metrics.trackAuth(false);
+      return res.status(401).json({ message: 'invalid credentials' });
+    }
+    metrics.trackAuth(true);
+    metrics.userLogin();
     const auth = await setAuth(user);
     res.json({ user, token: auth });
   })
@@ -82,6 +90,7 @@ authRouter.delete(
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
     await clearAuth(req);
+    metrics.userLogout();
     res.json({ message: 'logout successful' });
   })
 );
@@ -106,13 +115,6 @@ function readAuthToken(req) {
     return authHeader.split(' ')[1];
   }
   return null;
-}
-
-if (loginSuccess) {
-  metrics.trackAuth(true);
-  metrics.userLogin();
-} else {
-  metrics.trackAuth(false);
 }
 
 module.exports = { authRouter, setAuthUser, setAuth };
