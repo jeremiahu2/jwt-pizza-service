@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../config.js');
 const { asyncHandler } = require('../endpointHelper.js');
 const { DB, Role } = require('../database/database.js');
+const metrics = require('../metrics');
 const authRouter = express.Router();
 
 authRouter.docs = [
@@ -105,6 +106,13 @@ function readAuthToken(req) {
     return authHeader.split(' ')[1];
   }
   return null;
+}
+
+if (loginSuccess) {
+  metrics.trackAuth(true);
+  metrics.userLogin();
+} else {
+  metrics.trackAuth(false);
 }
 
 module.exports = { authRouter, setAuthUser, setAuth };
