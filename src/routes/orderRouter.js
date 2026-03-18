@@ -3,7 +3,8 @@ const config = require('../config.js');
 const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
-
+const metrics = require('../metrics');
+const start = Date.now();
 const orderRouter = express.Router();
 
 orderRouter.docs = [
@@ -40,7 +41,6 @@ orderRouter.docs = [
   },
 ];
 
-// getMenu
 orderRouter.get(
   '/menu',
   asyncHandler(async (req, res) => {
@@ -48,7 +48,6 @@ orderRouter.get(
   })
 );
 
-// addMenuItem
 orderRouter.put(
   '/menu',
   authRouter.authenticateToken,
@@ -63,7 +62,6 @@ orderRouter.put(
   })
 );
 
-// getOrders
 orderRouter.get(
   '/',
   authRouter.authenticateToken,
@@ -72,7 +70,6 @@ orderRouter.get(
   })
 );
 
-// createOrder
 orderRouter.post(
   '/',
   authRouter.authenticateToken,
@@ -92,5 +89,13 @@ orderRouter.post(
     }
   })
 );
+
+try {
+  const latency = Date.now() - start;
+  metrics.pizzaPurchase(true, latency, price);
+} catch (err) {
+  const latency = Date.now() - start;
+  metrics.pizzaPurchase(false, latency, 0);
+}
 
 module.exports = orderRouter;
