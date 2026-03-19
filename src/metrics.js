@@ -1,114 +1,171 @@
-const config = require('./config');
 const os = require('os');
 
-function sendMetric(name, value, type = 'gauge', unit = '1', attributes = {}) {
-  const metric = {
-    resourceMetrics: [
-      {
-        scopeMetrics: [
-          {
-            metrics: [
-              {
-                name,
-                unit,
-                [type]: {
-                  dataPoints: [
-                    {
-                      asInt: Math.round(value),
-                      timeUnixNano: Date.now() * 1000000,
-                      attributes: Object.entries(attributes).map(([k, v]) => ({
-                        key: k,
-                        value: { stringValue: String(v) },
-                      })),
-                    },
-                  ],
-                },
-              },
-            ],
-          },
-        ],
-      },
-    ],
+class Metrics {
+  constructor(config) {
+    this.config = config;
+    this.httpMetrics = {
+      totalRequests: 0,
+      getRequests: 0,
+      postRequests: 0,
+      putRequests: 0,
+      deleteRequests: 0,
+    };
+    this.authMetrics = {
+      successfulAttempts: 0,
+      failedAttempts: 0,
+    };
+    this.userMetrics = {
+      activeUsers: new Set(),
+    };
+    this.purchaseMetrics = {
+      pizzasSold: 0,
+      creationFailures: 0,
+      totalRevenue: 0,
+      latencies: [],
+    };
+    this.startTime = Date.now();
+    this.lastReportTime = Date.now();
+  }
+
+  requestTracker = (req, res, next) => {
+    this.httpMetrics.totalRequests++;
+    const method = req.method.toUpperCase();
+    switch (method) {
+      case 'GET':
+        this.httpMetrics.getRequests++;
+        break;
+      case 'POST':
+        this.httpMetrics.postRequests++;
+        break;
+      case 'PUT':
+        this.httpMetrics.putRequests++;
+        break;
+      case 'DELETE':
+        this.httpMetrics.deleteRequests++;
+        break;
+    }
+    if (req.user && req.user.id) {
+      this.userMetrics.activeUsers.add(req.user.id);
+    }
+    next();
   };
-  if (type === 'sum') {
-    metric.resourceMetrics[0].scopeMetrics[0].metrics[0].sum.aggregationTemporality =
-      'AGGREGATION_TEMPORALITY_CUMULATIVE';
-    metric.resourceMetrics[0].scopeMetrics[0].metrics[0].sum.isMonotonic = true;
+
+  trackAuthAttempt(success) {
+    if (success) {
+      this.authMetrics.successfulAttempts++;
+    } else {
+      this.authMetrics.failedAttempts++;
+    }
   }
-  fetch(config.metrics.endpointUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${config.metrics.accountId}:${config.metrics.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(metric),
-  }).catch(() => {});
-}
 
-function requestTracker(req, res, next) {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    sendMetric('requests_total', 1, 'sum', '1', {
-      method: req.method,
-      route: req.route?.path || req.originalUrl,
-      status: res.statusCode,
-    });
-    sendMetric('http_latency', duration, 'gauge', 'ms', {
-      route: req.route?.path || req.originalUrl,
-    });
-  });
-  next();
-}
+  pizzaPurchase(success, latency, price) {
+    if (success) {
+      this.purchaseMetrics.pizzasSold++;
+      this.purchaseMetrics.totalRevenue += price;
+    } else {
+      this.purchaseMetrics.creationFailures++;
+    }
+    this.purchaseMetrics.latencies.push(latency);
+  }
 
-function trackAuth(success) {
-  sendMetric('auth_attempts', 1, 'sum', '1', {
-    result: success ? 'success' : 'failure',
-  });
-}
+  getCpuUsagePercentage() {
+    const cpuUsage = os.loadavg()[0] / os.cpus().length;
+    return (cpuUsage * 100).toFixed(2);
+  }
 
-let activeUsers = 0;
+  getMemoryUsagePercentage() {
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const usedMemory = totalMemory - freeMemory;
+    const memoryUsage = ((usedMemory / totalMemory) * 100).toFixed(2);
+    return memoryUsage;
+  }
 
-function userLogin() {
-  activeUsers++;
-}
+  buildMetrics() {
+    const now = Date.now();
+    const timeSinceLastReport = now - this.lastReportTime;
+    this.lastReportTime = now;
 
-function userLogout() {
-  activeUsers = Math.max(0, activeUsers - 1);
-}
+    const metrics = {
+      timestamp: now,
+      source: this.config.source,
+      httpMetrics: {
+        totalRequests: this.httpMetrics.totalRequests,
+        getRequests: this.httpMetrics.getRequests,
+        postRequests: this.httpMetrics.postRequests,
+        putRequests: this.httpMetrics.putRequests,
+        deleteRequests: this.httpMetrics.deleteRequests,
+      },
+      authMetrics: {
+        successfulAttempts: this.authMetrics.successfulAttempts,
+        failedAttempts: this.authMetrics.failedAttempts,
+      },
+      userMetrics: {
+        activeUsers: this.userMetrics.activeUsers.size,
+      },
+      purchaseMetrics: {
+        pizzasSold: this.purchaseMetrics.pizzasSold,
+        creationFailures: this.purchaseMetrics.creationFailures,
+        totalRevenue: this.purchaseMetrics.totalRevenue,
+        avgLatency: this.purchaseMetrics.latencies.length > 0
+          ? this.purchaseMetrics.latencies.reduce((a, b) => a + b, 0) / this.purchaseMetrics.latencies.length
+          : 0,
+      },
+      systemMetrics: {
+        cpuUsage: this.getCpuUsagePercentage(),
+        memoryUsage: this.getMemoryUsagePercentage(),
+      },
+    };
 
-function pizzaPurchase(success, latency, price) {
-  sendMetric('pizza_orders', 1, 'sum', '1', {
-    status: success ? 'success' : 'failure',
-  });
-  sendMetric('pizza_latency', latency, 'gauge', 'ms', {
-    type: 'pizza_creation',
-  });
-  if (success) {
-    sendMetric('pizza_revenue', price, 'sum', 'usd', {
-      type: 'pizza_creation',
-    });
+    this.httpMetrics = {
+      totalRequests: 0,
+      getRequests: 0,
+      postRequests: 0,
+      putRequests: 0,
+      deleteRequests: 0,
+    };
+    this.authMetrics = {
+      successfulAttempts: 0,
+      failedAttempts: 0,
+    };
+    this.purchaseMetrics = {
+      pizzasSold: 0,
+      creationFailures: 0,
+      totalRevenue: 0,
+      latencies: [],
+    };
+    return metrics;
+  }
+
+  async sendToGrafana(metrics) {
+    try {
+      const response = await fetch(this.config.endpointUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.apiKey}`,
+        },
+        body: JSON.stringify(metrics),
+      });
+
+      if (!response.ok) {
+        console.error('Failed to send metrics to Grafana:', response.statusText);
+      }
+    } catch (error) {
+      console.error('Error sending metrics to Grafana:', error);
+    }
+  }
+
+  startPeriodicReporting(interval = 60000) {
+    setInterval(async () => {
+      try {
+        const metrics = this.buildMetrics();
+        await this.sendToGrafana(metrics);
+      } catch (error) {
+        console.error('Error in periodic metrics reporting:', error);
+      }
+    }, interval);
   }
 }
 
-function getCpu() {
-  return (os.loadavg()[0] / os.cpus().length) * 100;
-}
-
-function getMemory() {
-  return ((os.totalmem() - os.freemem()) / os.totalmem()) * 100;
-}
-
-setInterval(() => {
-  sendMetric('cpu_percent', getCpu(), 'gauge', '%');
-  sendMetric('memory_percent', getMemory(), 'gauge', '%');
-  sendMetric('active_users', activeUsers, 'gauge', '1');
-}, 5000);
-
-module.exports = {
-  requestTracker,
-  trackAuth,
-  pizzaPurchase,
-  userLogin,
-  userLogout,
-};
+module.exports = Metrics;
