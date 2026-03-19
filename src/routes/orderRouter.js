@@ -4,7 +4,6 @@ const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
 const metrics = require('../metrics');
-const start = Date.now();
 const orderRouter = express.Router();
 
 orderRouter.docs = [
@@ -55,7 +54,6 @@ orderRouter.put(
     if (!req.user.isRole(Role.Admin)) {
       throw new StatusCodeError('unable to add menu item', 403);
     }
-
     const addMenuItemReq = req.body;
     await DB.addMenuItem(addMenuItemReq);
     res.send(await DB.getMenu());
@@ -75,27 +73,30 @@ orderRouter.post(
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
     const orderReq = req.body;
+    const start = Date.now();
     const order = await DB.addDinerOrder(req.user, orderReq);
     const r = await fetch(`${config.factory.url}/api/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', authorization: `Bearer ${config.factory.apiKey}` },
-      body: JSON.stringify({ diner: { id: req.user.id, name: req.user.name, email: req.user.email }, order }),
+      body: JSON.stringify({
+        diner: { id: req.user.id, name: req.user.name, email: req.user.email },
+        order,
+      }),
     });
     const j = await r.json();
+    const latency = Date.now() - start;
     if (r.ok) {
+      const totalPrice = order.items.reduce((sum, item) => sum + item.price, 0);
+      metrics.pizzaPurchase(true, latency, totalPrice);
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
     } else {
-      res.status(500).send({ message: 'Failed to fulfill order at factory', followLinkToEndChaos: j.reportUrl });
+      metrics.pizzaPurchase(false, latency, 0);
+      res.status(500).send({
+        message: 'Failed to fulfill order at factory',
+        followLinkToEndChaos: j.reportUrl,
+      });
     }
   })
 );
-
-try {
-  const latency = Date.now() - start;
-  metrics.pizzaPurchase(true, latency, price);
-} catch (err) {
-  const latency = Date.now() - start;
-  metrics.pizzaPurchase(false, latency, 0);
-}
 
 module.exports = orderRouter;
