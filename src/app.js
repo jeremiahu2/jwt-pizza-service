@@ -16,6 +16,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(setAuthUser);
+app.use(metrics.requestTracker);
 app.use('/api/auth', authRouter);
 app.use('/api/franchise', franchiseRouter);
 app.use('/api/order', orderRouter);
@@ -30,6 +31,5 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   res.status(err.statusCode ?? 500).json({ message: err.message, stack: err.stack });
 });
-app.use(metrics.requestTracker);
 
 module.exports = app;
