@@ -3,7 +3,8 @@ const jwt = require('jsonwebtoken');
 const config = require('../config.js');
 const { asyncHandler } = require('../endpointHelper.js');
 const { DB, Role } = require('../database/database.js');
-const metrics = require('../metrics');
+const Metrics = require('../metrics');
+const metrics = new Metrics(config.metrics);
 const authRouter = express.Router();
 
 authRouter.docs = [
@@ -62,8 +63,7 @@ authRouter.post(
       return res.status(400).json({ message: 'name, email, and password are required' });
     }
     const user = await DB.addUser({ name, email, password, roles: [{ role: Role.Diner }] });
-    metrics.trackAuth(true);
-    metrics.userLogin();
+    metrics.trackAuthAttempt(true);
     const auth = await setAuth(user);
     res.json({ user, token: auth });
   })
@@ -75,11 +75,10 @@ authRouter.put(
     const { email, password } = req.body;
     const user = await DB.getUser(email, password);
     if (!user) {
-      metrics.trackAuth(false);
+      metrics.trackAuthAttempt(false);
       return res.status(401).json({ message: 'invalid credentials' });
     }
-    metrics.trackAuth(true);
-    metrics.userLogin();
+    metrics.trackAuthAttempt(true);
     const auth = await setAuth(user);
     res.json({ user, token: auth });
   })
@@ -90,7 +89,6 @@ authRouter.delete(
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
     await clearAuth(req);
-    metrics.userLogout();
     res.json({ message: 'logout successful' });
   })
 );
