@@ -15,7 +15,7 @@ function sendMetric(name, value, type = 'gauge', unit = '1', attributes = {}) {
                   dataPoints: [
                     {
                       asInt: Math.round(value),
-                      timeUnixNano: Date.now() * 1_000_000,
+                      timeUnixNano: Date.now() * 1000000,
                       attributes: Object.entries(attributes).map(([k, v]) => ({
                         key: k,
                         value: { stringValue: String(v) },
@@ -30,13 +30,11 @@ function sendMetric(name, value, type = 'gauge', unit = '1', attributes = {}) {
       },
     ],
   };
-
   if (type === 'sum') {
     metric.resourceMetrics[0].scopeMetrics[0].metrics[0].sum.aggregationTemporality =
       'AGGREGATION_TEMPORALITY_CUMULATIVE';
     metric.resourceMetrics[0].scopeMetrics[0].metrics[0].sum.isMonotonic = true;
   }
-
   fetch(config.metrics.endpointUrl, {
     method: 'POST',
     headers: {
@@ -44,20 +42,20 @@ function sendMetric(name, value, type = 'gauge', unit = '1', attributes = {}) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(metric),
-  }).catch((err) => console.error('Metric error', err));
+  }).catch(() => {});
 }
 
 function requestTracker(req, res, next) {
   const start = Date.now();
   res.on('finish', () => {
     const duration = Date.now() - start;
-    sendMetric('http_requests', 1, 'sum', '1', {
+    sendMetric('requests_total', 1, 'sum', '1', {
       method: req.method,
-      route: req.originalUrl,
+      route: req.route?.path || req.originalUrl,
       status: res.statusCode,
     });
     sendMetric('http_latency', duration, 'gauge', 'ms', {
-      route: req.originalUrl,
+      route: req.route?.path || req.originalUrl,
     });
   });
   next();
@@ -76,16 +74,20 @@ function userLogin() {
 }
 
 function userLogout() {
-  activeUsers--;
+  activeUsers = Math.max(0, activeUsers - 1);
 }
 
 function pizzaPurchase(success, latency, price) {
   sendMetric('pizza_orders', 1, 'sum', '1', {
     status: success ? 'success' : 'failure',
   });
-  sendMetric('pizza_latency', latency, 'gauge', 'ms');
+  sendMetric('pizza_latency', latency, 'gauge', 'ms', {
+    type: 'pizza_creation',
+  });
   if (success) {
-    sendMetric('pizza_revenue', price, 'sum', 'usd');
+    sendMetric('pizza_revenue', price, 'sum', 'usd', {
+      type: 'pizza_creation',
+    });
   }
 }
 
@@ -98,8 +100,8 @@ function getMemory() {
 }
 
 setInterval(() => {
-  sendMetric('cpu_usage', getCpu(), 'gauge', '%');
-  sendMetric('memory_usage', getMemory(), 'gauge', '%');
+  sendMetric('cpu_percent', getCpu(), 'gauge', '%');
+  sendMetric('memory_percent', getMemory(), 'gauge', '%');
   sendMetric('active_users', activeUsers, 'gauge', '1');
 }, 5000);
 
