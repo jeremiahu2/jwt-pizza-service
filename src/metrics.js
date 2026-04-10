@@ -138,6 +138,7 @@ function sendAllMetrics() {
   pizzaMetrics.sold = 0;
   pizzaMetrics.failures = 0;
   pizzaMetrics.revenue = 0;
+  console.log('sending metrics batch');
 }
 
 function start(period = 5000) {
