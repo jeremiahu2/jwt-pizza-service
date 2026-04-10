@@ -5,10 +5,9 @@ const franchiseRouter = require('./routes/franchiseRouter');
 const orderRouter = require('./routes/orderRouter');
 const userRouter = require('./routes/userRouter');
 const version = require('./version.json');
-const Metrics = require('./metrics');
+const metrics = require('./metrics');
 const config = require('./config');
 const app = express();
-const metrics = new Metrics(config.metrics);
 
 app.use(express.json());
 app.use(cors({
