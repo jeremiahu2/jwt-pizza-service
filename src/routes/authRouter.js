@@ -62,7 +62,7 @@ authRouter.post(
       return res.status(400).json({ message: 'name, email, and password are required' });
     }
     const user = await DB.addUser({ name, email, password, roles: [{ role: Role.Diner }] });
-    metrics.trackAuthAttempt(true);
+    metrics.authAttempt(true);
     const auth = await setAuth(user);
     res.json({ user, token: auth });
   })
@@ -74,10 +74,10 @@ authRouter.put(
     const { email, password } = req.body;
     const user = await DB.getUser(email, password);
     if (!user) {
-      metrics.trackAuthAttempt(false);
+      metrics.authAttempt(false);
       return res.status(401).json({ message: 'invalid credentials' });
     }
-    metrics.trackAuthAttempt(true);
+    metrics.authAttempt(true);
     const auth = await setAuth(user);
     res.json({ user, token: auth });
   })
