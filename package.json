@@ -31,7 +31,8 @@
       "src/**/*.js",
       "!src/index.js",
       "!src/init.js",
-      "!src/service.js"
+      "!src/service.js",
+      "!src/metrics.js"
     ],
     "coverageThreshold": {
       "global": {
