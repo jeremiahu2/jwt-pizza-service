@@ -18,7 +18,7 @@ app.use(cors({
 }));
 app.use(setAuthUser);
 app.use(metrics.requestTracker);
-metrics.start(5000);
+metrics.start();
 app.use('/api/auth', authRouter);
 app.use('/api/franchise', franchiseRouter);
 app.use('/api/order', orderRouter);
