@@ -127,7 +127,7 @@ async function sendAllMetrics() {
 function start(period = 5000) {
   console.log("METRICS START CALLED WITH:", period);
   if (process.env.NODE_ENV === 'test') return;
-  setInterval(sendAllMetrics, period);
+  // setInterval(sendAllMetrics, period);
 }
 
 module.exports = {
