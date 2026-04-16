@@ -75,20 +75,8 @@ orderRouter.post(
     const orderReq = req.body;
     const start = Date.now();
     const order = await DB.addDinerOrder(req.user, orderReq);
-    console.log("CALLING FACTORY...");
-      const r = await fetch(`${config.factory.url}/api/order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          authorization: `Bearer ${config.factory.apiKey}`
-        },
-        body: JSON.stringify({ test: true }),
-      });
-
-      console.log("FACTORY STATUS:", r.status);
-
-      const text = await r.text();
-      console.log("FACTORY RESPONSE:", text), {
+    console.log("FACTORY STATUS:", r.status);
+    const r = await fetch(`${config.factory.url}/api/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', authorization: `Bearer ${config.factory.apiKey}` },
       body: JSON.stringify({
@@ -96,6 +84,7 @@ orderRouter.post(
         order,
       }),
     });
+    console.log("FACTORY BODY:", await r.text());
     const j = await r.json();
     const latency = Date.now() - start;
     if (r.ok) {
