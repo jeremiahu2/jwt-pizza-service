@@ -34,7 +34,7 @@ async function sendLog(level, message, meta = {}) {
       body: JSON.stringify(logEvent),
     });
     if (!res.ok) {
-      console.error("Failed to send log to Grafana:", await res.text());
+      console.error("Grafana log failed:", await res.text());
     }
   } catch (err) {
     console.error("Logging error:", err.message);
