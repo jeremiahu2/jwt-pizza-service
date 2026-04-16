@@ -75,7 +75,6 @@ orderRouter.post(
     const orderReq = req.body;
     const start = Date.now();
     const order = await DB.addDinerOrder(req.user, orderReq);
-    console.log("FACTORY STATUS:", r.status);
     const r = await fetch(`${config.factory.url}/api/order`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', authorization: `Bearer ${config.factory.apiKey}` },
