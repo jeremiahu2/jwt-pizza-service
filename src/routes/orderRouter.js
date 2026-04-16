@@ -75,7 +75,20 @@ orderRouter.post(
     const orderReq = req.body;
     const start = Date.now();
     const order = await DB.addDinerOrder(req.user, orderReq);
-    const r = await fetch(`${config.factory.url}/api/order`, {
+    console.log("CALLING FACTORY...");
+      const r = await fetch(`${config.factory.url}/api/order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          authorization: `Bearer ${config.factory.apiKey}`
+        },
+        body: JSON.stringify({ test: true }),
+      });
+
+      console.log("FACTORY STATUS:", r.status);
+
+      const text = await r.text();
+      console.log("FACTORY RESPONSE:", text), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', authorization: `Bearer ${config.factory.apiKey}` },
       body: JSON.stringify({
