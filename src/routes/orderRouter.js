@@ -83,7 +83,6 @@ orderRouter.post(
         order,
       }),
     });
-    console.log("FACTORY BODY:", await r.text());
     const j = await r.json();
     const latency = Date.now() - start;
     if (r.ok) {
