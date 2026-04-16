@@ -84,6 +84,8 @@ orderRouter.post(
       }),
     });
     const j = await r.json();
+    console.log("Factory response status:", r.status);
+    console.log("Factory response body:", j);
     const latency = Date.now() - start;
     if (r.ok) {
       const totalPrice = order.items.reduce((sum, item) => sum + item.price, 0);
