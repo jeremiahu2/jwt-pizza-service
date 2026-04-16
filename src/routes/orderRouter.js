@@ -4,6 +4,7 @@ const { Role, DB } = require('../database/database.js');
 const { authRouter } = require('./authRouter.js');
 const { asyncHandler, StatusCodeError } = require('../endpointHelper.js');
 const metrics = require('../metrics');
+const logger = require('../logger');
 const orderRouter = express.Router();
 
 orderRouter.docs = [
@@ -73,6 +74,7 @@ orderRouter.post(
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
     const orderReq = req.body;
+    logger.log("factory", "factory request", orderReq);
     const start = Date.now();
     const order = await DB.addDinerOrder(req.user, orderReq);
     const r = await fetch(`${config.factory.url}/api/order`, {
@@ -90,9 +92,17 @@ orderRouter.post(
     if (r.ok) {
       const totalPrice = order.items.reduce((sum, item) => sum + item.price, 0);
       metrics.pizzaPurchase(true, latency, totalPrice);
+      logger.log("factory", "factory response", {
+        status: r.status,
+        body: j
+      });
       res.send({ order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt });
     } else {
       metrics.pizzaPurchase(false, latency, 0);
+      logger.log("factory", "factory response", {
+        status: r.status,
+        body: j
+      });
       res.status(500).send({
         message: 'Failed to fulfill order at factory',
         followLinkToEndChaos: j.reportUrl,
