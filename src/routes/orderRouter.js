@@ -90,11 +90,11 @@ orderRouter.post(
     });
     const j = await r.json();
     const latency = Date.now() - start;
-        logger.log("factory", "factory_response", {
-          status: r.status,
-          body: j,
-          latency,
-        });
+    logger.log("factory", "factory_response", {
+      status: r.status,
+      body: j,
+      latency,
+    });
     if (r.ok) {
       const totalPrice = order.items.reduce((sum, item) => sum + item.price, 0);
       metrics.pizzaPurchase(true, latency, totalPrice);
